@@ -42,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
         checkFile(new File(datapath + "tessdata/"));
 
-        mTess.init(datapath, language);
+        //mTess.init(datapath, language);
     }
 
     public void processImage(View view){
