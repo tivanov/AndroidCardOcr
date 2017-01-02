@@ -3,10 +3,10 @@
 <android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
+    android:layout_height="match_parent"
     xmlns:opencv="http://schemas.android.com/apk/res-auto"
     android:id="@+id/main_layout"
-    android:layout_height="match_parent"
-    tools:context=".MainActivity">
+        tools:context=".MainActivity">
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -21,15 +21,29 @@
             android:id="@+id/jcvImage"
             opencv:show_fps="false"
             opencv:camera_id="back"
-            />
+            android:alpha="1" />
 
     </RelativeLayout>
 
 <android.support.design.widget.FloatingActionButton
     android:id="@+id/fabRunOcr"
-    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_gravity="bottom|end"
+    android:layout_gravity="top|end"
     android:layout_margin="16dp"
-    android:src="@android:drawable/ic_dialog_email" />
+    android:padding="0dp"
+    android:src="@drawable/camera_icon"
+    android:background="#9a898989"
+    opencv:backgroundTint="@color/ColorAccentTransparent"
+    android:layout_width="wrap_content" />
+
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/fabThreshSetup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginEnd="20dp"
+        android:src="@drawable/settings_1"
+        android:layout_marginTop="85dp"
+        opencv:backgroundTint="@color/ColorAccent2Transparent"
+        opencv:fabSize="mini"/>
 </android.support.design.widget.CoordinatorLayout>

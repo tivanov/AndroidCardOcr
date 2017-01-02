@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CardOcr</string>
+    <string name="image_taken">Image taken</string>
 </resources>

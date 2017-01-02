@@ -1,27 +1,15 @@
 package me.tivanov.cardocr;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.provider.MediaStore;
+import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.view.Window;
+import android.view.WindowManager;
 
-import com.googlecode.tesseract.android.TessBaseAPI;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
@@ -29,29 +17,35 @@ import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Date;
 
-import static android.R.attr.bitmap;
+import me.tivanov.cardocr.Helper.Misc;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, CameraBridgeViewBase.CvCameraViewListener {
-    private static final int SHOW_RESULTS_TAG = 10;
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
+
     private CameraBridgeViewBase mOpenCvCameraView;
 
     private FloatingActionButton fabRunOcr;
+    private FloatingActionButton fabThreshSetup;
 
-    Bitmap image;
-    private TessBaseAPI mTess;
-    String datapath = "";
+    private Mat mRgba;
+    private Mat mGray;
+
+    private Point p1;
+    private Point p2;
+    private Point p3;
+    private Point p4;
+    private Scalar lineColor;
+    private int lineThickness;
+
+    private boolean shouldTakePicture;
+    private boolean goToSettings;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -69,29 +63,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
     };
-    private boolean shouldTakePicture;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        this.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        //Remove notification bar
+        this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         fabRunOcr = (FloatingActionButton) findViewById(R.id.fabRunOcr);
+        fabThreshSetup = (FloatingActionButton) findViewById(R.id.fabThreshSetup);
         mOpenCvCameraView = (JavaCameraView) findViewById(R.id.jcvImage);
         mOpenCvCameraView.setCvCameraViewListener(this);
 
         fabRunOcr.setOnClickListener(this);
+        fabThreshSetup.setOnClickListener(this);
 
-        //init image
-        image = BitmapFactory.decodeResource(getResources(), R.drawable.test_image);
-
-        //initialize Tesseract API
-        String language = "eng";
-        datapath = getFilesDir()+ "/tesseract/";
-        mTess = new TessBaseAPI();
-
-        checkFile(new File(datapath + "tessdata/"));
-
-        mTess.init(datapath, language);
+        lineColor = new Scalar(237, 238, 239);
+        lineThickness = 30;
     }
 
     protected void onPause() {
@@ -109,6 +99,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             Log.d(TAG, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+            if (mOpenCvCameraView != null)
+                mOpenCvCameraView.enableView();
         }
     }
 
@@ -119,108 +111,74 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mOpenCvCameraView.disableView();
     }
 
-    public void processImage(View view){
-        String OCRresult = null;
-        mTess.setImage(image);
-        OCRresult = mTess.getUTF8Text();
-        //TextView OCRTextView = (TextView) findViewById(R.id.OCRTextView);
-        //OCRTextView.setText(OCRresult);
-    }
-
-    private void checkFile(File dir) {
-        if (!dir.exists()&& dir.mkdirs()){
-            copyFiles();
-        }
-        if(dir.exists()) {
-            String datafilepath = datapath+ "/tessdata/eng.traineddata";
-            File datafile = new File(datafilepath);
-
-            if (!datafile.exists()) {
-                copyFiles();
-            }
-        }
-    }
-
-    private void copyFiles() {
-        try {
-            String filepath = datapath + "/tessdata/eng.traineddata";
-            AssetManager assetManager = getAssets();
-
-            InputStream instream = assetManager.open("tessdata/eng.traineddata");
-            OutputStream outstream = new FileOutputStream(filepath);
-
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = instream.read(buffer)) != -1) {
-                outstream.write(buffer, 0, read);
-            }
-
-
-            outstream.flush();
-            outstream.close();
-            instream.close();
-
-            File file = new File(filepath);
-            if (!file.exists()) {
-                throw new FileNotFoundException();
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     @Override
     public void onClick(View v) {
         if (v == this.fabRunOcr) {
             shouldTakePicture = true;
+        } else if (v == fabThreshSetup) {
+            goToSettings = true;
         }
+
     }
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-
+        mGray = new Mat();
+        mRgba = new Mat();
     }
 
     @Override
     public void onCameraViewStopped() {
-
+        mGray.release();
+        mRgba.release();
     }
 
     @Override
-    public Mat onCameraFrame(Mat inputFrame) {
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        mRgba = inputFrame.rgba();
 
-        if (shouldTakePicture){
-            Bitmap bmp = Bitmap.createBitmap(inputFrame.cols(), inputFrame.rows(), Bitmap.Config.ARGB_8888);
-            String OCRresult;
-            Utils.matToBitmap(inputFrame, bmp);
-            mTess.setImage(bmp);
-            OCRresult = mTess.getUTF8Text();
-            Log.d(TAG, OCRresult);
-            startShowActivity(OCRresult, bmp);
-            //TODO: stop camera
-            shouldTakePicture = false;
-        }
-        return inputFrame;
-    }
+        //overlay lines setup
+        //for line on top
+        p1 = new Point(60, 95);
+        p2 = new Point(mRgba.cols() - 60, 95);
+        //for line on bottom
+        p3 = new Point(60, mRgba.rows() - 95);
+        p4 = new Point(mRgba.cols() - 60, mRgba.rows() - 95);
 
-    private void startShowActivity(String OCRresult, Bitmap bmp) {
-        Intent intent = new Intent(this, ShowResultsActivity.class);
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        bmp.compress(Bitmap.CompressFormat.PNG, 100, stream);
-        byte[] byteArray = stream.toByteArray();
-        //intent.putExtra("imageTaken", byteArray);
-        intent.putExtra("OcrText", OCRresult);
-        startActivityForResult(intent, SHOW_RESULTS_TAG);
-    }
+        if (goToSettings || shouldTakePicture) {
+            Mat mRgbaSub =  mRgba.submat(new Rect(p1,p4));
+            Bitmap bmp = Bitmap.createBitmap(mRgbaSub.cols(), mRgbaSub.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(mRgbaSub, bmp);
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data)
-    {
-        if (requestCode == SHOW_RESULTS_TAG && resultCode == Activity.RESULT_OK) {
-            //TODO: restart camera
+            if (goToSettings){
+                goToSettings = false;
+                startNextActivity(bmp, SettingsActivity.class);
+            } else if (shouldTakePicture) {
+                shouldTakePicture = false;
+                startNextActivity(bmp, ShowResultsActivity.class);
+            }
         }
 
+        //line on top
+        Imgproc.line(mRgba,p1, p2, lineColor, lineThickness);
+        //line on bottom
+        Imgproc.line(mRgba,p3, p4, lineColor, lineThickness);
+        //left line
+        Imgproc.line(mRgba,p1, p3, lineColor, lineThickness);
+        //right line
+        Imgproc.line(mRgba,p2, p4, lineColor, lineThickness);
+        return mRgba;
+    }
+
+    private void startNextActivity(Bitmap bmp, Class ctx) {
+        String filename = "bitmap"+ new Date().getTime() + ".png";
+        String path = Misc.saveToInternalStorage(filename, bmp, getApplicationContext());
+        bmp.recycle();
+
+        //Pop intent
+        Intent intent = new Intent(this, ctx);
+        intent.putExtra("image", filename);
+        intent.putExtra("path", path);
+        startActivity(intent);
     }
 }
