@@ -29,20 +29,17 @@ import me.tivanov.cardocr.Helper.Misc;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, CameraBridgeViewBase.CvCameraViewListener2 {
     private static final String TAG = "MainActivity";
 
+    private static final int    OVERLAY_PADDING_TOP     = 90;
+    private static final int    OVERLAY_LINE_THICKNESS  = 30;
+    private static final Scalar OVERLAY_LINE_COLOR      = new Scalar(237, 238, 239);
+    private static final double CARD_SIDES_RATIO        = 0.628;
+
     private CameraBridgeViewBase mOpenCvCameraView;
 
     private FloatingActionButton fabRunOcr;
     private FloatingActionButton fabThreshSetup;
 
     private Mat mRgba;
-    private Mat mGray;
-
-    private Point p1;
-    private Point p2;
-    private Point p3;
-    private Point p4;
-    private Scalar lineColor;
-    private int lineThickness;
 
     private boolean shouldTakePicture;
     private boolean goToSettings;
@@ -79,9 +76,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         fabRunOcr.setOnClickListener(this);
         fabThreshSetup.setOnClickListener(this);
-
-        lineColor = new Scalar(237, 238, 239);
-        lineThickness = 30;
     }
 
     protected void onPause() {
@@ -123,30 +117,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        mGray = new Mat();
         mRgba = new Mat();
     }
 
     @Override
     public void onCameraViewStopped() {
-        mGray.release();
         mRgba.release();
     }
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         mRgba = inputFrame.rgba();
-
         //overlay lines setup
-        //for line on top
-        p1 = new Point(60, 95);
-        p2 = new Point(mRgba.cols() - 60, 95);
-        //for line on bottom
-        p3 = new Point(60, mRgba.rows() - 95);
-        p4 = new Point(mRgba.cols() - 60, mRgba.rows() - 95);
+        int height = mRgba.rows() - 2 * OVERLAY_PADDING_TOP;
+        int width  = (int)(height/CARD_SIDES_RATIO);
+        int distanceToEdge = (mRgba.cols() - width)/2;
+
+        Point p1 = new Point(distanceToEdge, OVERLAY_PADDING_TOP);
+        Point p4 = new Point(mRgba.cols() - distanceToEdge, mRgba.rows() - OVERLAY_PADDING_TOP);
 
         if (goToSettings || shouldTakePicture) {
-            Mat mRgbaSub =  mRgba.submat(new Rect(p1,p4));
+
+            int unitSize = (int)((p4.y - p1.y)/4);
+            int midHeight = (int)((p4.y - p1.y)/2);
+
+            p1.y = p1.y + unitSize*2;
+            p4.y = p4.y - unitSize;
+
+            Mat mRgbaSub =  mRgba.submat(new Rect(p1, p4));
             Bitmap bmp = Bitmap.createBitmap(mRgbaSub.cols(), mRgbaSub.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(mRgbaSub, bmp);
 
@@ -159,14 +157,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
 
-        //line on top
-        Imgproc.line(mRgba,p1, p2, lineColor, lineThickness);
-        //line on bottom
-        Imgproc.line(mRgba,p3, p4, lineColor, lineThickness);
-        //left line
-        Imgproc.line(mRgba,p1, p3, lineColor, lineThickness);
-        //right line
-        Imgproc.line(mRgba,p2, p4, lineColor, lineThickness);
+        Imgproc.rectangle(mRgba, p1, p4, OVERLAY_LINE_COLOR, OVERLAY_LINE_THICKNESS);
         return mRgba;
     }
 

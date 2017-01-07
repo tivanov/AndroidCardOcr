@@ -13,15 +13,17 @@ import android.widget.Spinner;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import me.tivanov.cardocr.Helper.Misc;
 import me.tivanov.cardocr.Helper.Session;
 
-import static org.opencv.imgproc.Imgproc.COLOR_RGBA2GRAY;
-import static org.opencv.imgproc.Imgproc.cvtColor;
+import static org.opencv.imgproc.Imgproc.rectangle;
 
 public class SettingsActivity extends AppCompatActivity implements View.OnClickListener, AdapterView.OnItemSelectedListener {
 
@@ -33,16 +35,11 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
             this.name = name;
             this.value = value;
         }
-
         @Override
         public String toString() {
             return name;
         }
     }
-
-    private static int THRESH_TYPE_NORMAL = 1;
-    private static int THRESH_TYPE_ADAPTIVE = 2;
-
 
     private ArrayAdapter<SpinnerMap> threshKindsA;
     private ArrayAdapter<SpinnerMap> threshTypesA;
@@ -51,14 +48,10 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     private ImageView imageTaken;
     private Button btnApply;
     private Button btnSave;
-
     private EditText etThresh;
     private EditText etMaxVal;
     private EditText etBlockSize;
     private EditText etConst;
-
-
-
     private Spinner spThresh;
     private Spinner spThreshType;
 
@@ -97,7 +90,7 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         spThresh.setAdapter(threshKindsA);
         spThresh.setOnItemSelectedListener(this);
         spThresh.setSelection(0);
-        setState(THRESH_TYPE_ADAPTIVE);
+        setState(Misc.THRESH_TYPE_ADAPTIVE);
 
         Bundle extras = getIntent().getExtras();
         if (extras != null) {
@@ -126,12 +119,12 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         etBlockSize.setEnabled(false);
         etConst.setEnabled(false);
 
-        if (threshType == THRESH_TYPE_ADAPTIVE) {
+        if (threshType == Misc.THRESH_TYPE_ADAPTIVE) {
             spThreshType.setAdapter(adaptiveThreshTypesA);
             etBlockSize.setEnabled(true);
             etConst.setEnabled(true);
 
-        } else if (threshType == THRESH_TYPE_NORMAL) {
+        } else if (threshType == Misc.THRESH_TYPE_NORMAL) {
             spThreshType.setAdapter(threshTypesA);
             etThresh.setEnabled(true);
             etMaxVal.setEnabled(true);
@@ -149,18 +142,17 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         ArrayList<SpinnerMap> threshTypes = new ArrayList<>();
         ArrayList<SpinnerMap> adaptiveThreshTypes = new ArrayList<>();
 
-        threshKinds.add(new SpinnerMap("ADAPTIVE", THRESH_TYPE_ADAPTIVE));
-        threshKinds.add(new SpinnerMap("NORMAL", THRESH_TYPE_NORMAL));
+        threshKinds.add(new SpinnerMap("ADAPTIVE", Misc.THRESH_TYPE_ADAPTIVE));
+        threshKinds.add(new SpinnerMap("NORMAL", Misc.THRESH_TYPE_NORMAL));
 
         threshTypes.add(new SpinnerMap("BINARY",Imgproc.THRESH_BINARY));
-        threshTypes.add(new SpinnerMap("BINARY_INV",Imgproc.THRESH_BINARY_INV));
-        threshTypes.add(new SpinnerMap("TRUNC",Imgproc.THRESH_TRUNC));
-        threshTypes.add(new SpinnerMap("TOZERO",Imgproc.THRESH_TOZERO));
-        threshTypes.add(new SpinnerMap("TOZERO_INV",Imgproc.THRESH_TOZERO_INV));
+        threshTypes.add(new SpinnerMap("BINARY INV",Imgproc.THRESH_BINARY_INV));
+        threshTypes.add(new SpinnerMap("TRUNCATE",Imgproc.THRESH_TRUNC));
+        threshTypes.add(new SpinnerMap("TO ZERO",Imgproc.THRESH_TOZERO));
+        threshTypes.add(new SpinnerMap("TO ZERO INV",Imgproc.THRESH_TOZERO_INV));
 
-        adaptiveThreshTypes.add(new SpinnerMap("MEAN_C",Imgproc.ADAPTIVE_THRESH_MEAN_C));
-        adaptiveThreshTypes.add(new SpinnerMap("GAUSSIAN_C",Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C));
-
+        adaptiveThreshTypes.add(new SpinnerMap("MEAN",Imgproc.ADAPTIVE_THRESH_MEAN_C));
+        adaptiveThreshTypes.add(new SpinnerMap("GAUSSIAN",Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C));
 
         threshKindsA = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, threshKinds);
         threshTypesA = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, threshTypes);
@@ -170,34 +162,33 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     @Override
     public void onClick(View v) {
         float threshold, maxVal, C;
-        int blockSize;
-        Mat image, mGray;
+        int blockSize, threshMethod, threshType;
+        Mat image;
 
+        if ((spThresh.getSelectedItem() == null) || (spThreshType.getSelectedItem() == null))return;
 
-        maxVal = Float.parseFloat(etMaxVal.getText().toString());
-        threshold = Float.parseFloat(etThresh.getText().toString());
-        blockSize = (int)Float.parseFloat(etBlockSize.getText().toString());
-        C = Float.parseFloat(etConst.getText().toString());
+        maxVal          = Float.parseFloat(etMaxVal.getText().toString());
+        threshold       = Float.parseFloat(etThresh.getText().toString());
+        blockSize       = (int)Float.parseFloat(etBlockSize.getText().toString());
+        C               = Float.parseFloat(etConst.getText().toString());
+        threshMethod    = ((SpinnerMap) spThresh.getSelectedItem()).value;
+        threshType      = ((SpinnerMap) spThreshType.getSelectedItem()).value;
 
         if (v == btnSave) {
             session.setThreshold(threshold);
             session.setMaxVal(maxVal);
             session.setBlockSize(blockSize);
             session.setConst(C);
+            session.setThreshMethod(threshMethod);
+            session.setThreshType(threshType);
             this.finish();
         } else if (v == btnApply) {
-            SpinnerMap selectedThresh = (SpinnerMap) spThresh.getSelectedItem();
-            if (selectedThresh == null) return;
+            //List<Rect> arreasOfInterest = Misc.findText(mRgba);
+            ArrayList<Rect> arreasOfInterest = Misc.findText(mRgba);
+            image = Misc.preProcessImage(threshMethod, threshType, mRgba, session);
 
-            int type = ((SpinnerMap)spThreshType.getSelectedItem()).value;
-            image = new Mat();
-            mGray = new Mat();
-            cvtColor(mRgba, mGray, COLOR_RGBA2GRAY);
-
-            if (selectedThresh.value == THRESH_TYPE_ADAPTIVE) { //ADAPTIVE
-                Imgproc.adaptiveThreshold(mGray, image, 255, type, Imgproc.THRESH_BINARY, blockSize, C);
-            } else if (selectedThresh.value == THRESH_TYPE_NORMAL) { //NORMAL
-                Imgproc.threshold(mGray, image,threshold, maxVal, type + Imgproc.THRESH_OTSU);
+            for (Rect r : arreasOfInterest) {
+                Imgproc.rectangle(image, r.tl(), r.br(), new Scalar(0, 255, 0), 2);
             }
 
             Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
