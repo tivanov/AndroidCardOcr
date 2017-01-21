@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <color tools:override="true" name="background_material_light">#e2e1e1</color>
+    <color name="foreground_material_light2">#282828</color>
+    <color name="nav_bar_transparent">#00282828</color>
+    <color name="background_material_light2">#f9f9f9</color>
+    <color tools:override="true" name="primary_text_default_material_dark">#e7e7e7</color>
+</resources>

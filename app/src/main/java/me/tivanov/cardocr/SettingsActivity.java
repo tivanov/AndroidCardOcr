@@ -2,7 +2,12 @@ package me.tivanov.cardocr;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.ContextMenu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -10,6 +15,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
@@ -18,15 +24,15 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import me.tivanov.cardocr.Helper.Misc;
 import me.tivanov.cardocr.Helper.Session;
 
-import static org.opencv.imgproc.Imgproc.rectangle;
-
 public class SettingsActivity extends AppCompatActivity implements View.OnClickListener, AdapterView.OnItemSelectedListener {
-
+    private static final String TAG = "SettingsActivity";
     private class SpinnerMap {
         String name;
         int value;
@@ -45,28 +51,51 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     private ArrayAdapter<SpinnerMap> threshTypesA;
     private ArrayAdapter<SpinnerMap> adaptiveThreshTypesA;
 
-    private ImageView imageTaken;
-    private Button btnApply;
-    private Button btnSave;
-    private EditText etThresh;
-    private EditText etMaxVal;
-    private EditText etBlockSize;
-    private EditText etConst;
-    private Spinner spThresh;
-    private Spinner spThreshType;
+    private ImageView   imageTaken;
+    private Button      btnApply;
+    private Button      btnSave;
+    private EditText    etThresh;
+    private EditText    etMaxVal;
+    private EditText    etBlockSize;
+    private EditText    etConst;
+    private Spinner     spThresh;
+    private Spinner     spThreshType;
 
     private Session session;
 
     private Mat mRgba;
+    private Bitmap imageBmp;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+        imageTaken = (ImageView) findViewById(R.id.imageTaken2);
+
+        if (savedInstanceState != null) {
+            imageBmp = savedInstanceState.getParcelable("bitmap");
+        }
+        else {
+            Bundle extras = getIntent().getExtras();
+            if (extras != null) {
+                String filename = extras.getString("image");
+                String filePath = extras.getString("path");
+                imageBmp = Misc.loadImageFromStorage(filename, filePath);
+                Misc.deleteImageFromStorage(filename, filePath);
+            }
+        }
+
+        if (imageBmp == null)
+            finish();
+
+        mRgba = new Mat();
+        Utils.bitmapToMat(imageBmp, mRgba);
+        imageTaken.setImageBitmap(imageBmp);
+
+        registerForContextMenu(imageTaken);
 
         session = new Session(getApplicationContext());
 
-        imageTaken = (ImageView) findViewById(R.id.imageTaken2);
         btnApply = (Button) findViewById((R.id.btnApply));
         btnSave = (Button) findViewById((R.id.btnSave));
         etThresh = (EditText) findViewById((R.id.etThresh));
@@ -81,7 +110,6 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         etBlockSize.setText(String.valueOf(session.getBlockSize()));
         etConst.setText(String.valueOf(session.getConst()));
 
-
         btnApply.setOnClickListener(this);
         btnSave.setOnClickListener(this);
 
@@ -91,16 +119,33 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         spThresh.setOnItemSelectedListener(this);
         spThresh.setSelection(0);
         setState(Misc.THRESH_TYPE_ADAPTIVE);
+    }
 
-        Bundle extras = getIntent().getExtras();
-        if (extras != null) {
-            String filename = getIntent().getStringExtra("image");
-            String filePath = getIntent().getStringExtra("path");
-            Bitmap originalImage = Misc.loadImageFromStorage(filename, filePath);
-            if (originalImage == null)  finish();
-            mRgba = new Mat();
-            Utils.bitmapToMat(originalImage, mRgba);
-            imageTaken.setImageBitmap(originalImage);
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable("bitmap", imageBmp);
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
+        super.onCreateContextMenu(menu, v, menuInfo);
+        if (v == imageTaken) {
+            MenuInflater inflater = getMenuInflater();
+            inflater.inflate(R.menu.image_long_press, menu);
+        }
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        switch(item.getItemId()) {
+            case R.id.image_menu_item_save:
+                MediaStore.Images.Media.insertImage(getContentResolver(), imageBmp,
+                        "CardOCRImage_" + String.valueOf(new Date().getTime()) ,
+                        "Image from the app Card OCR");
+                Toast.makeText(this, "Image successfully saved!", Toast.LENGTH_SHORT).show();
+                return true;
+            default:
+                return super.onContextItemSelected(item);
         }
     }
 
@@ -113,7 +158,6 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     }
 
     private void setState(int threshType) {
-
         etThresh.setEnabled(false);
         etMaxVal.setEnabled(false);
         etBlockSize.setEnabled(false);
@@ -159,6 +203,41 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         adaptiveThreshTypesA = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, adaptiveThreshTypes);
     }
 
+    private boolean validateInput() {
+        int blockSize;
+
+        if (((SpinnerMap) spThresh.getSelectedItem()).value == Misc.THRESH_TYPE_ADAPTIVE)  //ADAPTIVE
+        {
+            if (etBlockSize.getText().toString().equals("")) {
+                Toast.makeText(this, "Please input Block Size!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            if (etConst.getText().toString().equals("")) {
+                Toast.makeText(this, "Please input Const!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+
+            blockSize = (int)Float.parseFloat(etBlockSize.getText().toString());
+            if (blockSize % 2 == 0) {
+                Toast.makeText(this, "Block Size should be odd number!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        }
+        else if (((SpinnerMap) spThresh.getSelectedItem()).value == Misc.THRESH_TYPE_NORMAL)  //NORMAL
+        {
+            if (etMaxVal.getText().toString().equals("")) {
+                Toast.makeText(this, "Please input Max. Value!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            if (etThresh.getText().toString().equals("")) {
+                Toast.makeText(this, "Please input Threshold!", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+
+        }
+        return true;
+    }
+
     @Override
     public void onClick(View v) {
         float threshold, maxVal, C;
@@ -166,11 +245,18 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         Mat image;
 
         if ((spThresh.getSelectedItem() == null) || (spThreshType.getSelectedItem() == null))return;
+        if (!validateInput()) return;
 
-        maxVal          = Float.parseFloat(etMaxVal.getText().toString());
-        threshold       = Float.parseFloat(etThresh.getText().toString());
-        blockSize       = (int)Float.parseFloat(etBlockSize.getText().toString());
-        C               = Float.parseFloat(etConst.getText().toString());
+        try {
+            maxVal = Float.parseFloat(etMaxVal.getText().toString());
+            threshold = Float.parseFloat(etThresh.getText().toString());
+            blockSize = (int) Float.parseFloat(etBlockSize.getText().toString());
+            C = Float.parseFloat(etConst.getText().toString());
+        } catch (Exception e) {
+            Toast.makeText(this, "Error!. Please check input values!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         threshMethod    = ((SpinnerMap) spThresh.getSelectedItem()).value;
         threshType      = ((SpinnerMap) spThreshType.getSelectedItem()).value;
 
@@ -183,41 +269,30 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
             session.setThreshType(threshType);
             this.finish();
         } else if (v == btnApply) {
-            //List<Rect> arreasOfInterest = Misc.findText(mRgba);
-            ArrayList<Rect> arreasOfInterest = Misc.findText(mRgba);
-            image = Misc.preProcessImage(threshMethod, threshType, mRgba, session);
 
-            for (Rect r : arreasOfInterest) {
-                Imgproc.rectangle(image, r.tl(), r.br(), new Scalar(0, 255, 0), 2);
+            //prepare parameters
+            Map<String, String> params = new HashMap<>();
+            params.put("threshold", String.valueOf(threshold));
+            params.put("maxVal", String.valueOf(maxVal));
+            params.put("blockSize", String.valueOf(blockSize));
+            params.put("const", String.valueOf(C));
+
+            try {
+                //find text on image
+                ArrayList<Rect> arreasOfInterest = Misc.findText(mRgba);
+                //do the preprocessing
+                image = Misc.preProcessImage(threshMethod, threshType, mRgba, params);
+                //show where the text is
+                for (Rect r : arreasOfInterest)
+                    Imgproc.rectangle(image, r.tl(), r.br(), new Scalar(0, 255, 0), 2);
+
+                imageBmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(image, imageBmp);
+                imageTaken.setImageBitmap(imageBmp);
+            } catch (Exception e) {
+                Toast.makeText(this, "Unexpected error!", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Exception while pre-processing image. Message:" + e.getMessage());
             }
-
-            Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(image, bmp);
-            imageTaken.setImageBitmap(bmp);
-
-//            threshold = Float.parseFloat(etThresh.getText().toString());
-//            maxVal = Float.parseFloat(etMaxVal.getText().toString());
-//            Mat image = new Mat();
-//            Mat mGray = new Mat();
-//            cvtColor(mRgba, mGray, COLOR_RGBA2GRAY);
-//            Imgproc.threshold(mGray, image,threshold, maxVal, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
-//            Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
-//            Utils.matToBitmap(image, bmp);
-//            imageTaken.setImageBitmap(bmp);
-
-            //vaka dava ok rezultat so adaptive threshold
-//            threshold = Float.parseFloat(etThresh.getText().toString());
-//            maxVal = Float.parseFloat(etMaxVal.getText().toString());
-//            Mat image = new Mat();
-//            Mat mGray = new Mat();
-//            cvtColor(mRgba, mGray, COLOR_RGBA2GRAY);
-                                        //src, destt, maxValue, adaptiveMethod,             thresholdType,          blockSize,          C
-//                                                                                                                //kolku pogolemo C, tolku pomalku detali
-//            Imgproc.adaptiveThreshold(mGray, image, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, (int)threshold, (int)maxVal); //dobro e so (11, 12)
-//            //Imgproc.threshold(mGray, image,threshold, maxVal, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);   //blockSize (paren),  C
-//            Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
-//            Utils.matToBitmap(image, bmp);
-//            imageTaken.setImageBitmap(bmp);
         }
     }
 }

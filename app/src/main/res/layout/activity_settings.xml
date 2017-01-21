@@ -23,7 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:text="Method" />
+        android:text="@string/threshold_method" />
 
     <Spinner
         android:layout_width="match_parent"
@@ -35,7 +35,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="12sp"
-        android:text="Type" />
+        android:text="@string/threshold_type" />
 
     <Spinner
         android:layout_width="match_parent"
@@ -57,36 +57,32 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="0"
                 android:layout_column="0"
-                android:text="Thresh."
+                android:text="@string/thresh"
                 android:textSize="12sp"
                 android:labelFor="@+id/etThresh"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="0"
                 android:layout_column="1"
-                android:text="MaxVal"
+                android:text="@string/max_value"
                 android:textSize="12sp"
                 android:labelFor="@+id/etMaxVal"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="0"
                 android:layout_column="2"
-                android:text="Block Size"
+                android:text="@string/block_size"
                 android:textSize="12sp"
                 android:labelFor="@+id/etBlockSize"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="0"
                 android:layout_column="3"
-                android:text="C"
+                android:text="@string/c"
                 android:textSize="12sp"
                 android:labelFor="@+id/etConst"/>
 
@@ -97,7 +93,6 @@
             <EditText
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="1"
                 android:layout_column="0"
                 android:id="@id/etThresh"
                 android:inputType="number" />
@@ -106,7 +101,6 @@
             <EditText
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="1"
                 android:layout_column="1"
                 android:id="@id/etMaxVal"
                 android:inputType="number" />
@@ -114,7 +108,6 @@
             <EditText
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="1"
                 android:layout_column="2"
                 android:id="@id/etBlockSize"
                 android:inputType="numberDecimal" />
@@ -122,35 +115,48 @@
             <EditText
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_row="1"
                 android:layout_column="3"
                 android:id="@id/etConst"
                 android:inputType="number" />
         </TableRow>
 
 
-
     </TableLayout>
 
-    <TableLayout
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:stretchColumns="*"
-        android:shrinkColumns="*">
-        <TableRow>
-            <Button
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/btnApply"
-                android:text="Try" />
-            <Button
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/btnSave"
-                android:text="Save" />
+        android:layout_height="45dp">
+        <View
+            android:id="@+id/horizontalDivider"
+            android:layout_width="1dip"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginBottom="4dip"
+            android:layout_marginTop="4dip"
+            android:background="?android:attr/dividerVertical"
+            android:layout_centerHorizontal="true"/>
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/btnApply"
+            android:text="@string/try_text"
+            android:layout_toLeftOf="@id/horizontalDivider"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"/>
 
-        </TableRow>
-    </TableLayout>
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/btnSave"
+            android:text="@string/apply_text"
+            android:layout_toEndOf="@id/horizontalDivider"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentTop="true"/>
+
+
+    </RelativeLayout>
+
 
 
 </LinearLayout>

@@ -19,16 +19,23 @@
         android:contentDescription="@string/image_taken" />
 
     <TextView
+        android:text="@string/text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="OCR TEXT WILL APPEAR HERE"
-        android:id="@+id/tvOcrText"
+        android:id="@+id/textView"
+        android:labelFor="@+id/tvOcrText"/>
+
+    <EditText
+        android:inputType="text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@id/tvOcrText"
         android:textSize="20sp"/>
 
     <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/btnDoOcr"
-        android:text="GO" />
+        android:text="@string/perform_ocr" />
 
 </LinearLayout>

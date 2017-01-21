@@ -5,11 +5,14 @@ import android.app.ProgressDialog;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
 
@@ -30,36 +33,60 @@ public class ShowResultsActivity extends AppCompatActivity implements View.OnCli
     private static final String TAG = "ShowResultsActivity";
 
     private ImageView       imageTaken;
-    private TextView        tvOcrText;
+    private EditText        tvOcrText;
     private Mat             mRgba;
     private Session         session;
     private String          datapath;
     private TessBaseAPI     mTess;
-    private ProgressDialog progressDialog;
+    private ProgressDialog  progressDialog;
+    private Bitmap          originalImage;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_results);
+
         imageTaken = (ImageView) findViewById(R.id.imageTaken);
-        tvOcrText = (TextView) findViewById(R.id.tvOcrText);
-        (findViewById(R.id.btnDoOcr)).setOnClickListener(this);
 
-        session = new Session(getApplicationContext());
+        if (savedInstanceState != null) {
+            originalImage = savedInstanceState.getParcelable("bitmap");
+        }
+        else {
+            Bundle extras = getIntent().getExtras();
+            if (extras != null) {
+                String filename = extras.getString("image");
+                String filePath = extras.getString("path");
+                originalImage = Misc.loadImageFromStorage(filename, filePath);
+                Misc.deleteImageFromStorage(filename, filePath);
+            }
+        }
 
-        if (getIntent().getExtras() == null) finishCancel();
-
-        String filename = getIntent().getStringExtra("image");
-        String filePath = getIntent().getStringExtra("path");
-        Bitmap originalImage = Misc.loadImageFromStorage(filename, filePath);
-        if (originalImage == null) finishCancel();
-
-        imageTaken.setImageBitmap(originalImage);
+        if (originalImage == null)
+            finish();
         mRgba = new Mat();
         Utils.bitmapToMat(originalImage, mRgba);
-        tessInit();
+        imageTaken.setImageBitmap(originalImage);
 
-        Misc.deleteImageFromStorage(filename, filePath);
+        tvOcrText = (EditText) findViewById(R.id.tvOcrText);
+        (findViewById(R.id.btnDoOcr)).setOnClickListener(this);
+        session = new Session(getApplicationContext());
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable("bitmap", originalImage);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 
     private void tessInit() {
@@ -74,18 +101,25 @@ public class ShowResultsActivity extends AppCompatActivity implements View.OnCli
 
     private void doOcr() {
         startProgressDialog();
-
-        Mat preprocessed = Misc.preProcessImage(session.getThreshMethod(), session.getThreshType(), mRgba, session);
-        Bitmap bmp = Bitmap.createBitmap(preprocessed.cols(), preprocessed.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(preprocessed, bmp);
-
         String OCRresult;
-        mTess.setImage(bmp);
-        OCRresult = mTess.getUTF8Text();
-        Log.d(TAG, OCRresult);
-        imageTaken.setImageBitmap(bmp);
-        tvOcrText.setText(OCRresult);
-        dismissProgressDialog();
+
+        try {
+            tessInit();
+            Mat preprocessed = Misc.preProcessImage(session.getThreshMethod(), session.getThreshType(), mRgba, session);
+            Bitmap bmp = Bitmap.createBitmap(preprocessed.cols(), preprocessed.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(preprocessed, bmp);
+            mTess.setImage(bmp);
+            OCRresult = mTess.getUTF8Text();
+            Log.d(TAG, OCRresult);
+            imageTaken.setImageBitmap(bmp);
+            tvOcrText.setText(OCRresult);
+            imageTaken.setImageBitmap(bmp);
+        } catch (Exception e) {
+            Toast.makeText(this, "Error performing OCR!", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Exception while performing OCR. Message:" + e.getMessage());
+        } finally {
+            dismissProgressDialog();
+        }
     }
 
     private void startProgressDialog()
@@ -139,9 +173,11 @@ public class ShowResultsActivity extends AppCompatActivity implements View.OnCli
                 throw new FileNotFoundException();
             }
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            Log.e(TAG, "FileNotFoundException while loading Tesseract. Message:" + e.getMessage());
+            //e.printStackTrace();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "IOException while loading Tesseract. Message:" + e.getMessage());
+            //e.printStackTrace();
         }
     }
 

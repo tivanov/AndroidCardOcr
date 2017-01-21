@@ -1,4 +1,14 @@
 <resources>
-    <string name="app_name">CardOcr</string>
+    <string name="app_name">Card OCR</string>
     <string name="image_taken">Image taken</string>
+    <string name="threshold_method">Threshold Method</string>
+    <string name="threshold_type">Threshold Type</string>
+    <string name="thresh">Thresh.</string>
+    <string name="max_value">Max. Value</string>
+    <string name="block_size">Block Size</string>
+    <string name="c">C</string>
+    <string name="try_text">Try</string>
+    <string name="apply_text">Apply</string>
+    <string name="perform_ocr">Perform OCR</string>
+    <string name="text">Text:</string>
 </resources>

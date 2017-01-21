@@ -136,10 +136,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Point p1 = new Point(distanceToEdge, OVERLAY_PADDING_TOP);
         Point p4 = new Point(mRgba.cols() - distanceToEdge, mRgba.rows() - OVERLAY_PADDING_TOP);
 
-        if (goToSettings || shouldTakePicture) {
 
+        if (goToSettings){
+            goToSettings = false;
+            Mat mRgbaSub =  mRgba.submat(new Rect(p1, p4));
+            Bitmap bmp = Bitmap.createBitmap(mRgbaSub.cols(), mRgbaSub.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(mRgbaSub, bmp);
+            startNextActivity(bmp, SettingsActivity.class);
+        } else if (shouldTakePicture) {
             int unitSize = (int)((p4.y - p1.y)/4);
-            int midHeight = (int)((p4.y - p1.y)/2);
 
             p1.y = p1.y + unitSize*2;
             p4.y = p4.y - unitSize;
@@ -148,15 +153,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Bitmap bmp = Bitmap.createBitmap(mRgbaSub.cols(), mRgbaSub.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(mRgbaSub, bmp);
 
-            if (goToSettings){
-                goToSettings = false;
-                startNextActivity(bmp, SettingsActivity.class);
-            } else if (shouldTakePicture) {
-                shouldTakePicture = false;
-                startNextActivity(bmp, ShowResultsActivity.class);
-            }
+            shouldTakePicture = false;
+            startNextActivity(bmp, ShowResultsActivity.class);
         }
-
         Imgproc.rectangle(mRgba, p1, p4, OVERLAY_LINE_COLOR, OVERLAY_LINE_THICKNESS);
         return mRgba;
     }

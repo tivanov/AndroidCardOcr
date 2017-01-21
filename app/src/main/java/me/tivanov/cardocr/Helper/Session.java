@@ -4,7 +4,6 @@ package me.tivanov.cardocr.Helper;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
-
 import org.opencv.imgproc.Imgproc;
 
 
