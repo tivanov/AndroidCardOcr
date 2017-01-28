@@ -4,7 +4,9 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Environment;
 
+import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
@@ -21,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import static org.opencv.core.Core.FILLED;
 import static org.opencv.core.Core.countNonZero;
@@ -131,40 +134,124 @@ public class Misc {
         return dest;
     }
 
-    public static ArrayList<Rect> findText(Mat original) {
-        ArrayList<Rect> ret = new ArrayList<>();
-        Mat small = new Mat();
-        cvtColor(original, small, Imgproc.COLOR_BGR2GRAY);
-        // morphological gradient
+    public static void savePublicImage(Bitmap bmp, String fileName) {
+        String sdCardPath = Environment.getExternalStorageDirectory().getPath();
+        if (!sdCardPath.endsWith("/"))
+            sdCardPath = sdCardPath + "/";
+        File myDir=new File(sdCardPath+"OCRImages");
+        myDir.mkdirs();
+        File file = new File (myDir, fileName);
+        if (file.exists ()) file.delete ();
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, out);
+            out.flush();
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void savePublicImage(Mat mat, String fileName) {
+        Bitmap bmp = Bitmap.createBitmap(mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(mat, bmp);
+        savePublicImage(bmp, fileName);
+    }
+
+    public static ArrayList<Rect> findText(Mat original, boolean saveSteps) {
+        Random generator = new Random();
+        int n = 10000;
+        n = generator.nextInt(n);
+        Scalar contourColor = new Scalar(255, 255, 255);
+
+        Mat gray = new Mat();
+        cvtColor(original, gray, Imgproc.COLOR_BGR2GRAY);
+        // 1) morphological gradient
         Mat grad = new Mat();
         Mat morphKernel = getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
-        morphologyEx(small, grad, Imgproc.MORPH_GRADIENT, morphKernel);
-        // binarize
+        if (saveSteps) savePublicImage(morphKernel, n + "_0-Morph_kernel.jpg");
+        morphologyEx(gray, grad, Imgproc.MORPH_GRADIENT, morphKernel);
+        if (saveSteps) savePublicImage(grad, n + "_1-Morph_gradient.jpg");
+
+        // 2) binarize
         Mat bw = new Mat();
         threshold(grad, bw, 0.0, 255.0, Imgproc.THRESH_OTSU);
-        // connect horizontally oriented regions
+        if (saveSteps) savePublicImage(bw, n + "_2-Binarized_gradient.jpg");
+
+        // 3) connect horizontally oriented regions
         Mat connected = new Mat();
         morphKernel = getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
         morphologyEx(bw, connected, Imgproc.MORPH_CLOSE, morphKernel);
-        // find contours
+        if (saveSteps) savePublicImage(connected, n + "_3-Connected_horiz_regions.jpg");
+
+        // 4) find contours
         Mat mask = Mat.zeros(bw.size(), CV_8UC1);
         List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchy = new Mat();
         findContours(connected, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
-        // filter contours
+
+        // 5) filter contours
         Rect rect;
+        ArrayList<Rect> textRects = new ArrayList<>();
         for(int idx = 0; idx < contours.size(); idx++)
         {
             rect = boundingRect(contours.get(idx));
             Mat maskROI = new Mat(mask, rect);
             // fill the contour
-            drawContours(mask, contours, idx, new Scalar(255, 255, 255), FILLED);
-            // ratio of nllon-zero pixels in the filled region
+            drawContours(mask, contours, idx, contourColor, FILLED);
+            // ratio of non-zero pixels in the filled region
             double r = (double)countNonZero(maskROI)/(rect.width*rect.height);
             if (r > .45  && (rect.height > 8 && rect.width > 8))
-                ret.add(rect);
+                textRects.add(rect);
             //    rectangle(original, rect.tl(), rect.br(), new Scalar(0, 255, 0), 2);
         }
-        return filteredRects(ret);
+
+        if (saveSteps) savePublicImage(mask, n + "_4-Final_contours.jpg");
+        return filteredRects(textRects);
     }
+
+
+    public static ArrayList<Rect> findText(Mat original) {
+        Scalar contourColor = new Scalar(255, 255, 255);
+        Mat gray = new Mat();
+        cvtColor(original, gray, Imgproc.COLOR_BGR2GRAY);
+
+        // 1) morphological gradient
+        Mat grad = new Mat();
+        Mat morphKernel = getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
+        morphologyEx(gray, grad, Imgproc.MORPH_GRADIENT, morphKernel);
+
+        // 2) binarize
+        Mat bw = new Mat();
+        threshold(grad, bw, 0.0, 255.0, Imgproc.THRESH_OTSU);
+
+        // 3) connect horizontally oriented regions
+        Mat connected = new Mat();
+        morphKernel = getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
+        morphologyEx(bw, connected, Imgproc.MORPH_CLOSE, morphKernel);
+
+        // 4) find contours
+        Mat mask = Mat.zeros(bw.size(), CV_8UC1);
+        List<MatOfPoint> contours = new ArrayList<>();
+        Mat hierarchy = new Mat();
+        findContours(connected, contours, hierarchy, Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
+
+        // 5) filter contours
+        Rect currentRect;
+        Mat maskROI;
+        ArrayList<Rect> textRects = new ArrayList<>();
+        for(int idx = 0; idx < contours.size(); idx++)
+        {
+            currentRect = boundingRect(contours.get(idx));
+            maskROI = new Mat(mask, currentRect);
+            // fill the contour
+            drawContours(mask, contours, idx, contourColor, FILLED);
+            // ratio of non-zero pixels in the filled region
+            double r = (double)countNonZero(maskROI)/(currentRect.width*currentRect.height);
+            if (r > .45  && (currentRect.height > 8 && currentRect.width > 8))
+                textRects.add(currentRect);
+        }
+        return filteredRects(textRects);
+    }
+
 }

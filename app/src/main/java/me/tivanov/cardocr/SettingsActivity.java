@@ -12,6 +12,8 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
@@ -31,8 +33,9 @@ import java.util.Map;
 import me.tivanov.cardocr.Helper.Misc;
 import me.tivanov.cardocr.Helper.Session;
 
-public class SettingsActivity extends AppCompatActivity implements View.OnClickListener, AdapterView.OnItemSelectedListener {
+public class SettingsActivity extends AppCompatActivity implements View.OnClickListener, AdapterView.OnItemSelectedListener, CompoundButton.OnCheckedChangeListener {
     private static final String TAG = "SettingsActivity";
+
     private class SpinnerMap {
         String name;
         int value;
@@ -60,11 +63,14 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     private EditText    etConst;
     private Spinner     spThresh;
     private Spinner     spThreshType;
+    private CheckBox    cbFindText;
+    private CheckBox    cbSaveSteps;
 
     private Session session;
 
     private Mat mRgba;
     private Bitmap imageBmp;
+    private Bitmap imageOnDisplayBmp;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +110,8 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
         etConst = (EditText) findViewById((R.id.etConst));
         spThresh = (Spinner) findViewById(R.id.spAdaptive) ;
         spThreshType = (Spinner) findViewById(R.id.spThreshType) ;
+        cbFindText =(CheckBox) findViewById(R.id.cbFindText) ;
+        cbSaveSteps =(CheckBox) findViewById(R.id.cbSaveSteps) ;
 
         etThresh.setText(String.valueOf(session.getThreshold()));
         etMaxVal.setText(String.valueOf(session.getMaxVal()));
@@ -112,6 +120,8 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
 
         btnApply.setOnClickListener(this);
         btnSave.setOnClickListener(this);
+
+        cbFindText.setOnCheckedChangeListener(this);
 
         fillLists();
 
@@ -139,11 +149,13 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
     public boolean onContextItemSelected(MenuItem item) {
         switch(item.getItemId()) {
             case R.id.image_menu_item_save:
-                MediaStore.Images.Media.insertImage(getContentResolver(), imageBmp,
-                        "CardOCRImage_" + String.valueOf(new Date().getTime()) ,
-                        "Image from the app Card OCR");
-                Toast.makeText(this, "Image successfully saved!", Toast.LENGTH_SHORT).show();
-                return true;
+                if (imageOnDisplayBmp != null) {
+                    MediaStore.Images.Media.insertImage(getContentResolver(), imageOnDisplayBmp,
+                            "CardOCRImage_" + String.valueOf(new Date().getTime()),
+                            "Image from the app Card OCR");
+                    Toast.makeText(this, "Image successfully saved!", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
             default:
                 return super.onContextItemSelected(item);
         }
@@ -178,6 +190,15 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
 
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
+
+    }
+
+    @Override
+    public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+        if (buttonView == cbFindText)
+        {
+            cbSaveSteps.setEnabled(cbFindText.isChecked());
+        }
 
     }
 
@@ -278,17 +299,21 @@ public class SettingsActivity extends AppCompatActivity implements View.OnClickL
             params.put("const", String.valueOf(C));
 
             try {
-                //find text on image
-                ArrayList<Rect> arreasOfInterest = Misc.findText(mRgba);
+
                 //do the preprocessing
                 image = Misc.preProcessImage(threshMethod, threshType, mRgba, params);
-                //show where the text is
-                for (Rect r : arreasOfInterest)
-                    Imgproc.rectangle(image, r.tl(), r.br(), new Scalar(0, 255, 0), 2);
+                if (cbFindText.isChecked()) {
+                    //find text on image
+                    ArrayList<Rect> arreasOfInterest = Misc.findText(mRgba, cbSaveSteps.isChecked());
+                    //show where the text is
+                    for (Rect r : arreasOfInterest)
+                        Imgproc.rectangle(image, r.tl(), r.br(), new Scalar(0, 255, 0), 2);
+                }
 
-                imageBmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
-                Utils.matToBitmap(image, imageBmp);
-                imageTaken.setImageBitmap(imageBmp);
+                imageOnDisplayBmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(image, imageOnDisplayBmp);
+                imageTaken.setImageBitmap(imageOnDisplayBmp);
+                imageTaken.invalidate();
             } catch (Exception e) {
                 Toast.makeText(this, "Unexpected error!", Toast.LENGTH_SHORT).show();
                 Log.e(TAG, "Exception while pre-processing image. Message:" + e.getMessage());

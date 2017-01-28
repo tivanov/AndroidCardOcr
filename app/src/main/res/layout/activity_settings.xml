@@ -19,6 +19,17 @@
         android:contentDescription="@string/image_taken" />
 
 
+    <CheckBox
+        android:text="Find text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/cbFindText" />
+    <CheckBox
+        android:text="Save images from steps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/cbSaveSteps" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
